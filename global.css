@@ -9,7 +9,7 @@
 }
 .custom-tooltip{
     position:absolute;
-    width:180px;
+    width:100px;
     min-height:50px;
     padding:10px 5px;
     background:white;

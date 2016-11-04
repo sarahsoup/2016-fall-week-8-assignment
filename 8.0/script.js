@@ -35,8 +35,8 @@ var axisY = d3.axisLeft()
 
 //Line generator
 var lineGenerator = d3.line()
-    .x(function(d){return scaleX(d.year)})
-    .y(function(d){return scaleY(d.value)})
+    .x(function(d){return scaleX(new Date(d.key))})
+    .y(function(d){return scaleY(d.averagePrice)})
     .curve(d3.curveCardinal);
 
 d3.queue()
@@ -61,9 +61,9 @@ d3.queue()
             .style('border-color','white')
             .on('click',function(d){
                 //Hint: how do we filter flights for particular airlines?
-                //data.filter(...)
-
+                var dataFiltered = data.filter(function(e){return d == e.airline});
                 //How do we then update the dots?
+                draw(dataFiltered);
             });
 
         //Draw axis
@@ -72,6 +72,8 @@ d3.queue()
             .call(axisX);
         plot.append('g').attr('class','axis axis-y')
             .call(axisY);
+        //Append path
+        plot.append('path').attr('class','time-series');
 
         draw(data);
 
@@ -79,6 +81,8 @@ d3.queue()
 
 function draw(rows){
     //IMPORTANT: data transformation
+    rows.sort(function(a,b){return a.travelDate - b.travelDate});
+
     var flightsByTravelDate = d3.nest().key(function(d){return d.travelDate})
         .entries(rows);
 
@@ -86,12 +90,68 @@ function draw(rows){
        day.averagePrice = d3.mean(day.values, function(d){return d.price});
     });
 
-    console.log(flightsByTravelDate);
+    console.log(flightsByTravelDate[0]);
 
     //Draw dots
 
+    //update
+    var node = plot.selectAll('.node')
+      .data(rows,function(d){return d.id});
+
+    //enter
+    var nodeEnter = node.enter()
+      .append('circle')
+      .attr('class','node')
+      .on('mouseenter',function(d){
+        var tooltip = d3.select('.custom-tooltip');
+            tooltip.select('.title')
+                .html(d.airline)
+            tooltip.select('.value')
+                .html(d.price);
+
+            tooltip.transition().style('opacity',1);
+
+            d3.select(this).style('stroke-width','3px');
+        })
+        .on('mousemove',function(d){
+            var tooltip = d3.select('.custom-tooltip');
+            var xy = d3.mouse( d3.select('.container').node() );
+            tooltip
+                .style('left',xy[0]+10+'px')
+                .style('top',xy[1]+10+'px');
+        })
+        .on('mouseleave',function(d){
+            var tooltip = d3.select('.custom-tooltip');
+            tooltip.transition().style('opacity',0);
+
+            d3.select(this).style('stroke-width','0px');
+        });
+
+    //enter + update
+    nodeEnter
+      .merge(node)
+      .attr('r',3)
+      .attr('cx',function(d){return scaleX(d.travelDate)})
+      .attr('cy',function(d){return scaleY(d.price)})
+      .style('fill',function(d){return scaleColor(d.airline)});
+
+    //exit
+    node.exit().remove();
 
     //Draw <path>
+    plot.select('.time-series')
+    .datum(flightsByTravelDate)
+    .transition()
+    .attr('d',function(array){
+      return lineGenerator(array);
+    })
+    .style('stroke-width','2px')
+    .style('stroke','red')
+    .style('stroke',function(array){
+      return scaleColor(array[0].values[0].airline);
+    })
+    .style('fill','none');
+
 }
 
 function parse(d){
